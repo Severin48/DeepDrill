@@ -12,6 +12,7 @@ playground.xcworkspace
 # Package.pins
 # Package.resolved
 .build/
+src/cmake-build-debug
 
 # CocoaPods
 #
