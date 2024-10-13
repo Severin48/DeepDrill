@@ -43,9 +43,9 @@ else()
 endif()
 
 # Specify link options
-target_link_libraries(deepdrill PUBLIC ${GMP_LDFLAGS} ${SFML_LDFLAGS})
-target_link_libraries(deepmake PUBLIC ${GMP_LDFLAGS} ${SFML_LDFLAGS})
-target_link_libraries(deepzoom PUBLIC ${GMP_LDFLAGS} ${SFML_LDFLAGS})
+target_link_libraries(deepdrill PUBLIC ${GMP_LDFLAGS} ${SFML_LDFLAGS} pthread)
+target_link_libraries(deepmake PUBLIC ${GMP_LDFLAGS} ${SFML_LDFLAGS} pthread)
+target_link_libraries(deepzoom PUBLIC ${GMP_LDFLAGS} ${SFML_LDFLAGS} pthread)
 
 # Add sub directories
 add_subdirectory(util)
