@@ -109,6 +109,11 @@ ImageMaker::draw(DrillMap &map)
     }
 }
 
+// float evaluateDownscalingQuality(const sf::Image &downscaledImage, const sf::Image &originalImage) {
+//     // TODO: Calculate PSNR, SSIM, or other metrics
+//     return qualityScore;
+// }
+
 void
 ImageMaker::draw(DrillMap &map1, DrillMap &map2, isize frame, float zoom)
 {
@@ -177,6 +182,9 @@ ImageMaker::draw(DrillMap &map1, DrillMap &map2, isize frame, float zoom)
         downscaler.setUniform("next", colorizer2.getTexture());
     }
 
+    // TODO: Sichergehen, dass es tatsächlich das richtige Referenzbild ist
+    // sf::Image originalImage = downscaler.getTexture().copyToImage();
+
     // 3. Scale down
     downscaler.setUniform("size", sf::Vector2f(illuminator.getSize()));
     downscaler.setUniform("zoom", zoom);
@@ -184,6 +192,9 @@ ImageMaker::draw(DrillMap &map1, DrillMap &map2, isize frame, float zoom)
 
     // 4. Read back image data
     image = downscaler.getTexture().copyToImage();
+
+    // 5. Evaluate downscaling quality
+    // float quality = evaluateDownscalingQuality(image, originalImage);
 }
 
 sf::Vector3f
