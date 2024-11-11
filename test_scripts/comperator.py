@@ -1,23 +1,22 @@
 from PySide6.QtWidgets import QApplication, QMainWindow, QGraphicsScene, QGraphicsView, QGraphicsPixmapItem, QFileDialog, QFrame
 from PySide6.QtGui import QPixmap, QImage,QPainter
-from PySide6.QtCore import Qt, QRect, QPoint
+from PySide6.QtCore import Qt, QRect, QPoint, QSignalBlocker
 import PySide6.QtGui
 from prettytable import PrettyTable
 from tqdm import tqdm
-from window7 import Ui_Comparator_window 
+from window10 import Ui_Comparator_window 
 import cv2
 import numpy as np
 import image_similarity_measures.evaluate as img_eval
 
-max_zoom = 200
+max_zoom = 300
 
 class ResizableFrame(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMouseTracking(True)
-        self.setFrameShape(QFrame.StyledPanel)
         
-        self.grip_size = 30 
+        self.grip_size = 50
         self.is_resizing = False
         self.resize_direction = None
 
@@ -39,16 +38,12 @@ class ResizableFrame(QFrame):
         if not self.is_resizing:
             if self.is_on_left_edge(event.position()) or self.is_on_right_edge(event.position()):
                 self.setCursor(Qt.SizeHorCursor)
-            elif self.is_on_top_edge(event.position()) or self.is_on_bottom_edge(event.position()):
-                self.setCursor(Qt.SizeVerCursor)
             else:
                 self.setCursor(Qt.ArrowCursor)
         else:
             delta = event.globalPosition().toPoint() - self.start_pos
             rect = self.original_rect
-            if self.resize_direction == 'left':
-                new_rect = QRect(rect.x() + delta.x(), rect.y(), rect.width() - delta.x(), rect.height())
-            elif self.resize_direction == 'right':
+            if self.resize_direction == 'right':
                 new_rect = QRect(rect.x(), rect.y(), rect.width() + delta.x(), rect.height())
 
             self.setGeometry(new_rect)
@@ -87,27 +82,32 @@ class Comperator(QMainWindow, Ui_Comparator_window):
         super().__init__()
         self.setupUi(self)
 
-        self.original_image = None
-        self.compare_image = None
+        self.original_image_left = None
+        self.original_image_right = None
+
+        self.image_right = None
+        self.image_left = None
+        
         self.zoom_level = 0
-        self.filter = '' 
 
         self.custom_elements()
         self.connect_ui()
 
     def finalize_ui(self):
         # splitter size 
-        self.splitter.setSizes([1,8])
+        self.splitter_outer.setSizes([1,8])
+        self.splitter_inner.setSizes([8,1])
 
-        self.original_frame.setGeometry(0,0,self.outer_frame.width()/2,self.outer_frame.height())
-        self.compare_frame.setGeometry(0,0,self.outer_frame.width(),self.outer_frame.height())
+
+        self.left_frame.setGeometry(0,0,self.outer_frame.width()/2,self.outer_frame.height())
+        self.right_frame.setGeometry(0,0,self.outer_frame.width(),self.outer_frame.height())
 
 
         # if DEBUG
-        self.load_image('test_img/original/seahorse1_4k.jpg',False)
         self.load_image('test_img/original/seahorse1_1920x1080.png',True)
+        self.load_image('test_img/original/seahorse1_4k.jpg',False)
 
-        self.filter='''
+        filter_right ='''
 # Scale
 #image = cv2.resize(image, (1920, 1080), interpolation=cv2.INTER_LANCZOS4)
 image = cv2.resize(image, (1920, 1080), interpolation=cv2.INTER_LINEAR)
@@ -118,45 +118,44 @@ amount = 0.15
 blur = cv2.GaussianBlur(image, (0, 0), sigma)
 image = cv2.addWeighted(image, 1 + amount, blur , -amount, 0)
 '''
-        self.filter_code.setPlainText(self.filter)
+        self.filter_code_right.setPlainText(filter_right)
         # endif DEBUG
-        
 
     def custom_elements(self):
-        geo = self.original_frame.geometry()
-        children = self.original_frame.children()
-        self.original_frame.setStyleSheet("border:0px;opacity:0%")
+        geo = self.left_frame.geometry()
+        children = self.left_frame.children()
+        self.left_frame.setStyleSheet("border:0px;opacity:0%")
         
-        new_frame = ResizableFrame(self.original_frame.parent())
+        new_frame = ResizableFrame(self.left_frame.parent())
         new_frame.setGeometry(geo.x(),geo.y(),geo.width(),geo.height())
-        new_frame.setLayout(self.original_frame.layout())
+        new_frame.setLayout(self.left_frame.layout())
 
         # copy children
         for child in children:
             child.setParent(new_frame)
 
-        self.original_frame = new_frame
+        self.left_frame= new_frame
 
-        self.original_frame.setStyleSheet("border-right:3px solid;border-style: solid;border-color: rgb(10, 10, 10)")
-        self.compare_frame.setStyleSheet("border-right:3px solid;border-style: solid;border-color: rgb(0, 0, )")
+        self.left_frame.setStyleSheet("border-right:3px solid;border-style: solid;border-color: rgb(10, 10, 10)")
+        self.right_frame.setStyleSheet("border-right:3px solid;border-style: solid;border-color: rgb(0, 0, )")
 
-        self.graphicsView_compare.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);
-        self.graphicsView_compare.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff);
-        self.graphicsView_original.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);
-        self.graphicsView_original.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff);
+        self.graphicsView_right.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);
+        self.graphicsView_right.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff);
+        self.graphicsView_left.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff);
+        self.graphicsView_left.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff);
 
-        self.graphicsView_original.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
-        self.graphicsView_original.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        self.graphicsView_original.setRenderHint(QPainter.Antialiasing, False)
+        self.graphicsView_left.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
+        self.graphicsView_left.setRenderHint(QPainter.SmoothPixmapTransform, False)
+        self.graphicsView_left.setRenderHint(QPainter.Antialiasing, False)
 
-        self.graphicsView_compare.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
-        self.graphicsView_compare.setRenderHint(QPainter.SmoothPixmapTransform, False)
-        self.graphicsView_compare.setRenderHint(QPainter.Antialiasing, False)
+        self.graphicsView_right.setRenderHints(QPainter.SmoothPixmapTransform | QPainter.Antialiasing)
+        self.graphicsView_right.setRenderHint(QPainter.SmoothPixmapTransform, False)
+        self.graphicsView_right.setRenderHint(QPainter.Antialiasing, False)
 
 
     def resizeEvent(self,event):
-        self.original_frame.setGeometry(0,0,self.outer_frame.width()/2,self.outer_frame.height())
-        self.compare_frame.setGeometry(0,0,self.outer_frame.width(),self.outer_frame.height())
+        self.left_frame.setGeometry(0,0,self.outer_frame.width()/2,self.outer_frame.height())
+        self.right_frame.setGeometry(0,0,self.outer_frame.width(),self.outer_frame.height())
         QMainWindow.resizeEvent(self, event)
 
     def connect_ui(self):
@@ -168,19 +167,20 @@ image = cv2.addWeighted(image, 1 + amount, blur , -amount, 0)
         self.scale_slider.valueChanged.connect(self.slider_changed)
 
         # Connect horizontal scrollbars
-        self.graphicsView_original.horizontalScrollBar().valueChanged.connect(self.graphicsView_compare.horizontalScrollBar().setValue)
-        self.graphicsView_compare.horizontalScrollBar().valueChanged.connect(self.graphicsView_original.horizontalScrollBar().setValue)
+        self.graphicsView_left.horizontalScrollBar().valueChanged.connect(self.graphicsView_right.horizontalScrollBar().setValue)
+        self.graphicsView_right.horizontalScrollBar().valueChanged.connect(self.graphicsView_left.horizontalScrollBar().setValue)
 
         # Connect vertical scrollbars
-        self.graphicsView_original.verticalScrollBar().valueChanged.connect(self.graphicsView_compare.verticalScrollBar().setValue)
-        self.graphicsView_compare.verticalScrollBar().valueChanged.connect(self.graphicsView_original.verticalScrollBar().setValue)
+        self.graphicsView_left.verticalScrollBar().valueChanged.connect(self.graphicsView_right.verticalScrollBar().setValue)
+        self.graphicsView_right.verticalScrollBar().valueChanged.connect(self.graphicsView_left.verticalScrollBar().setValue)
 
         # connect filter button
-        self.apply_filter_btn.clicked.connect(self.apply_filter)
+        self.apply_left_btn.clicked.connect(self.apply_filter_left)
+        self.apply_right_btn.clicked.connect(self.apply_filter_right)
 
         # connect splitter
-        self.splitter.splitterMoved.connect(self.splitter_moved)
-
+        self.splitter_inner.splitterMoved.connect(self.splitter_moved)
+        self.splitter_outer.splitterMoved.connect(self.splitter_moved)
 
     # ########## UI Connections ##########
     def open_original_file_dialog(self):
@@ -190,8 +190,8 @@ image = cv2.addWeighted(image, 1 + amount, blur , -amount, 0)
                 self.load_image(file_path, True)
 
     def splitter_moved(self):
-        self.original_frame.setGeometry(0,0,self.outer_frame.width()/2,self.outer_frame.height())
-        self.compare_frame.setGeometry(0,0,self.outer_frame.width(),self.outer_frame.height())
+        self.left_frame.setGeometry(0,0,self.outer_frame.width()/2,self.outer_frame.height())
+        self.right_frame.setGeometry(0,0,self.outer_frame.width(),self.outer_frame.height())
 
     def open_compare_file_dialog(self):
             file_path, _ = QFileDialog.getOpenFileName(self, "Open compare Image", "", "Images (*.png *.xpm *.jpg *.bmp);;All Files (*)")
@@ -202,74 +202,95 @@ image = cv2.addWeighted(image, 1 + amount, blur , -amount, 0)
     def slider_changed(self):
         before_zoom = self.zoom_level
         self.zoom_level = self.scale_slider.value()
-        zoom_factor = 1.01
+        zoom_factor_small = 1.01
+        zoom_factor_big= 1.01
 
         if before_zoom > self.zoom_level:
-            zoom_factor = 1/zoom_factor
-
-        ## Zoom for self.graphicsView_original
-        self.graphicsView_original.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
-        self.graphicsView_original.scale(zoom_factor, zoom_factor)
-        self.graphicsView_compare.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
-        self.graphicsView_compare.scale(zoom_factor, zoom_factor)
-
-        #self.graphicsView_compare.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
-        #self.graphicsView_compare.scale(zoom_factor, zoom_factor)
+            zoom_factor_small = 1/zoom_factor_small
+            zoom_factor_big = 1/zoom_factor_big
 
 
-
-
+        self.graphicsView_left.setTransformationAnchor(QGraphicsView.ViewportAnchor.NoAnchor)
+        self.graphicsView_left.scale(zoom_factor_big,zoom_factor_big)
+        self.graphicsView_right.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        self.graphicsView_right.scale(zoom_factor_small, zoom_factor_small)
 
 
         
-    def load_image(self, image_path, isOriginal):
+    def load_image(self, image_path, isLeft):
         cv_image = cv2.imread(image_path)
         
-        if isOriginal:
-            self.original_image = cv_image
+        if isLeft:
+            self.original_image_left = cv_image
             cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-            self.scene_original = QGraphicsScene()
-            pixmap_original = cv2_to_qpixmap(cv_image)
-            self.image_item_original = QGraphicsPixmapItem(pixmap_original)
-            self.scene_original.addItem(self.image_item_original)
-            self.graphicsView_original.setScene(self.scene_original)
-            self.graphicsView_original.update()
-            self.graphicsView_original.setDragMode(QGraphicsView.ScrollHandDrag)
-            #self.graphicsView_original.fitInView(self.scene_original.sceneRect(), Qt.KeepAspectRatio)
+            self.scene_left = QGraphicsScene()
+            pixmap_left = cv2_to_qpixmap(cv_image)
+            self.image_item_left = QGraphicsPixmapItem(pixmap_left)
+            self.scene_left.addItem(self.image_item_left)
+            self.graphicsView_left.setScene(self.scene_left)
+            self.graphicsView_left.update()
+            self.graphicsView_left.setDragMode(QGraphicsView.ScrollHandDrag)
+            self.image_left = cv_image
         else:
-            self.compare_image_original = cv_image
-            self.compare_image = cv_image
+            self.original_image_right = cv_image
             cv_image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
-            self.scene_compare = QGraphicsScene()
-            pixmap_compare = cv2_to_qpixmap(cv_image)
-            self.image_item_compare = QGraphicsPixmapItem(pixmap_compare)
-            self.scene_compare.addItem(self.image_item_compare)
-            self.graphicsView_compare.setScene(self.scene_compare)
-            self.graphicsView_compare.setDragMode(QGraphicsView.ScrollHandDrag)
-            #self.graphicsView_compare.fitInView(self.scene_compare.sceneRect(), Qt.KeepAspectRatio)
-        
-    def apply_filter(self):
-        image = self.compare_image_original.copy()
+            self.scene_right = QGraphicsScene()
+            pixmap_right = cv2_to_qpixmap(cv_image)
+            self.image_item_right = QGraphicsPixmapItem(pixmap_right)
+            self.scene_right.addItem(self.image_item_right)
+            self.graphicsView_right.setScene(self.scene_right)
+            self.graphicsView_right.setDragMode(QGraphicsView.ScrollHandDrag)
+            self.image_right= cv_image
+
+            
+    def apply_filter_right(self):
+        image = self.original_image_right.copy()
 
         # highly problematic, but we are professionals... 
-        filter = self.filter_code.toPlainText()
+        filter = self.filter_code_right.toPlainText()
         local_scope = {"image":image}
         exec(filter, globals(),local_scope)
         image = local_scope["image"]
 
         cv_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        self.scene_compare = QGraphicsScene()
-        pixmap_compare = cv2_to_qpixmap(cv_image)
-        self.image_item_compare = QGraphicsPixmapItem(pixmap_compare)
-        self.scene_compare.addItem(self.image_item_compare)
-        self.graphicsView_compare.setScene(self.scene_compare)
-        self.graphicsView_compare.setDragMode(QGraphicsView.ScrollHandDrag)
-        self.graphicsView_compare.update()
+        self.scene_right = QGraphicsScene()
+        pixmap_right = cv2_to_qpixmap(cv_image)
+        self.image_item_right = QGraphicsPixmapItem(pixmap_right)
+        self.scene_right.addItem(self.image_item_right)
+        self.graphicsView_right.setScene(self.scene_right)
+        self.graphicsView_right.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.graphicsView_right.update()
+
+        self.image_right= image
 
         # also calculate metrics on new image
         metrics = ["psnr",'ssim']
-        print(calc_metrics(metrics,self.original_image, image))
+        print(calc_metrics(metrics,self.original_image_left, image))
 
+
+    def apply_filter_left(self):
+        image = self.original_image_left.copy()
+
+        # highly problematic, but we are professionals... 
+        filter = self.filter_code_left.toPlainText()
+        local_scope = {"image":image}
+        exec(filter, globals(),local_scope)
+        image = local_scope["image"]
+
+        cv_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        self.scene_left = QGraphicsScene()
+        pixmap_left = cv2_to_qpixmap(cv_image)
+        self.image_item_left = QGraphicsPixmapItem(pixmap_left)
+        self.scene_left.addItem(self.image_item_left)
+        self.graphicsView_left.setScene(self.scene_left)
+        self.graphicsView_left.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.graphicsView_left.update()
+
+        self.image_left = image
+
+        # also calculate metrics on new image
+        metrics = ["psnr",'ssim']
+        print(calc_metrics(metrics,self.image_left, self.image_right))
 
 ## END COMPONENT ##
 
