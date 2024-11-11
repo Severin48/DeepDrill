@@ -119,6 +119,7 @@ blur = cv2.GaussianBlur(image, (0, 0), sigma)
 image = cv2.addWeighted(image, 1 + amount, blur , -amount, 0)
 '''
         self.filter_code.setPlainText(self.filter)
+        self.apply_filter()
         # endif DEBUG
         
 
@@ -216,12 +217,6 @@ image = cv2.addWeighted(image, 1 + amount, blur , -amount, 0)
         #self.graphicsView_compare.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorViewCenter)
         #self.graphicsView_compare.scale(zoom_factor, zoom_factor)
 
-
-
-
-
-
-        
     def load_image(self, image_path, isOriginal):
         cv_image = cv2.imread(image_path)
         
