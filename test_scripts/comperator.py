@@ -110,11 +110,14 @@ class Comperator(QMainWindow, Ui_Comparator_window):
         self.load_image('test_img/original/seahorse1_4k.jpg',False)
 
         filter_right ='''
+# Downscaler options:
+# INTER_NEAREST, INTER_LINEAR, INTER_AREA,
+# INTER_CUBIC, INTER_LANCZOS4
+
 # Scale
-#image = cv2.resize(image, (1920, 1080), interpolation=cv2.INTER_LANCZOS4)
 image = cv2.resize(image, (1920, 1080), interpolation=cv2.INTER_LINEAR)
 
-# sharpen
+# Sharpen
 sigma = 1.0
 amount = 0.15
 blur = cv2.GaussianBlur(image, (0, 0), sigma)
