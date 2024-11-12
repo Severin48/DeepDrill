@@ -16,6 +16,7 @@ src/cmake-build-debug
 build/
 test_img/*.jpg
 test_scripts/__pycache__
+test_scripts/output
 project
 
 # CocoaPods
