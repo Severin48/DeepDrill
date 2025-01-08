@@ -190,7 +190,7 @@ void main()
 
             // read the corresponding texel from the next texture
             vec4 color2 = lanczos(next, coord2);
-            vec4 gaussian2 = gaussianAt(curr, coord);
+            vec4 gaussian2 = gaussianAt(next, coord2);
 
             //vec4 finalColor2 = (color2 * (1.0-amount)) + (gaussian2 * (1.0 * amount));
             vec4 finalColor2 = mix(color2, gaussian2, amount);
