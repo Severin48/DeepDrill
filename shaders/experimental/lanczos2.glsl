@@ -25,14 +25,15 @@ vec2 zoomed(vec2 coord) {
 
 float sinc(float x) {
     if (x == 0.0) return 1.0;
-    x = B * PI * x;
-    return sin(x)/(x);
+    float piX = x * PI;
+    return sin(piX)/(piX);
 }
 
 float lanczosAt(float x) {
     if (x == 0.0) return 1.0;
     if (abs(x) >= A) return 0.0;
-    return (sinc(x) * sinc(x/A));
+    float bX = B * x;
+    return (sinc(bX) * sinc(bX/A));
 }
 
 vec4 lanczos(sampler2D sampler, vec2 coord) {
