@@ -3,10 +3,13 @@
 //
 // Parameter to tweak:
 // AMOUNT: used to determine how much the sharped Image is added to to the
-// original 
+//         original 
 // SD: standard deviation in gaussian blur
-// With AMOUNT=0.5 and SD=1.0 result looks little sharper than vanilla
-// bilinear interpolation
+// AMOUNT: factor for subtracting the soft image from the original
+// GAUSS_SIZE: the size of the gaussian blur
+// 
+// With AMOUNT=0.5, SD=1.0, GAUSS_SIZE=8 the result looks very simelar to 
+// Lanczos scaling
 // -----------------------------------------------------------------------------
 
 uniform sampler2D curr;
@@ -17,6 +20,7 @@ uniform float zoom;
 #define PI (3.1415926535897932384626433)
 #define AMOUNT (0.5)
 #define SD (1.0)
+#define GAUSS_SIZE (8)
 
 vec2 zoomed(vec2 coord) {
     return (coord / zoom) + 0.5 - (0.5 / zoom);
@@ -25,7 +29,6 @@ vec2 zoomed(vec2 coord) {
 float gauss(float x, float sx){
     float arg = x;
     arg = -1./2.*arg*arg/sx;
-    
     float a = 1./(pow(2.*3.1415*sx, 0.5));
     
     return a*exp(arg);
@@ -34,20 +37,17 @@ float gauss(float x, float sx){
 vec4 soft(sampler2D sampler, vec2 coord) {
     vec4 color = vec4(0.0);
     float weightSum = 0.0;
-    int Aint = 8;
-    float scale = size.x/size.y;
-
     vec2 texCoord = coord * size;
-    vec2 texBase = floor(texCoord - 0.5) + 0.5;
-    for (int j = -Aint + 1; j <= Aint; ++j) {
-        for (int i = -Aint + 1; i <=Aint; ++i) {
-            vec2 offset = vec2(float(i), float(j));
-            vec2 tap = texBase + offset;
-            vec2 sincDist = (tap - texCoord);
+    vec2 texFract = fract(texCoord);
 
-            float weight = gauss(sincDist.x, SD) * gauss(sincDist.y, SD);
+    for (int j = -GAUSS_SIZE + 1; j <= GAUSS_SIZE; ++j) {
+        for (int i = -GAUSS_SIZE + 1; i <=GAUSS_SIZE; ++i) {
+
+            vec2 offset = vec2(float(i), float(j));
+            vec2 dist = texFract - offset;
+            float weight = gauss(dist.x, SD) * gauss(dist.y, SD);
             
-            color += texture2D(sampler, tap / size) * weight;
+            color += texture2D(sampler, floor(texCoord+offset)/size) * weight;
             weightSum += weight;
         }
     }
@@ -83,23 +83,18 @@ vec4 USM(sampler2D sampler, vec2 coord) {
 }
 
 void main() {
-    // Read texel from the current texture
     vec2 coord = gl_TexCoord[0].xy;
     coord.y = 1.0 - coord.y;
     coord = zoomed(coord);
 
     vec4 color1 = USM(curr, coord);
 
+    // temporal interpolation 
     if (zoom > 1.0) {
-
-        // Check if a corresponding texel exists in the next texture
         vec2 coord2 = 2.0 * coord - vec2(0.5,0.5);
+
         if (coord2.x >= 0.0 && coord2.x <= 1.0 && coord2.y >= 0.0 && coord2.y <= 1.0) {
-
-            // Read the corresponding texel from the next texture
             vec4 color2 = USM(next, coord2);
-
-            // Interpolate between both texels (linear)
             color1 = mix(color1, color2, zoom - 1.0);
         }
     }

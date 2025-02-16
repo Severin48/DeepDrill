@@ -13,7 +13,7 @@ uniform float zoom;
 
 #define PI (3.1415926535897932384626433)
 // Size of Lanczos window 
-#define A (10.0)
+#define A (2.0)
 const int Aint = int(A);
 
 vec2 zoomed(vec2 coord) {
@@ -21,7 +21,7 @@ vec2 zoomed(vec2 coord) {
 }
 
 float sinc(float x) {
-    if (x == 0.0) return 1.0;
+    if (abs(x) < 1e-6) return 1.0;
     float piX = x * PI;
     return sin(piX)/(piX);
 }
@@ -46,7 +46,7 @@ vec4 lanczos(sampler2D sampler, vec2 coord) {
             vec2 dist = texFract - offset;
             float weight = lanczosAt(dist.x) * lanczosAt(dist.y);
 
-            color += texture2D(sampler, (floor(texCoord)+offset)/size) * weight;
+            color += texture2D(sampler, (texCoord+offset)/size) * weight;
             weightSum += weight;
         }
     }
